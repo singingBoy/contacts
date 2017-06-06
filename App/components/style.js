@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
         color: '#555'
     },
     listItem: {
-        height: 45,
+        height: 65,
         alignItems: 'center',
         marginLeft: 10,
         marginRight: 30,

@@ -12,12 +12,13 @@ import {
   View
 } from 'react-native';
 import App from './App/app'
+import Tree from './App/tree'
 
 export default class contacts extends Component {
   render() {
     return (
       <View style={styles.container}>
-        <App/>
+        <Tree/>
       </View>
     );
   }

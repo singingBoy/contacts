@@ -30,7 +30,7 @@ export default class Head extends React.Component {
                     <View style={styles.searchBar}>
                         <TextInput style={[styles.search, {fontSize: 14}]} placeholder="搜索"/>
                         <TouchableOpacity style={styles.searchBtn}>
-                            <Image style={styles.searchImg} source={require('./img/search.png')}/>
+                            <Image style={styles.searchImg} source={require('../img/search.png')}/>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -44,7 +44,7 @@ export default class Head extends React.Component {
                                        underlineColorAndroid="transparent" placeholder="搜索"/>
                         </View>
                         <TouchableOpacity style={styles.searchBtn}>
-                            <Image style={styles.searchImg} source={require('./img/search.png')}/>
+                            <Image style={styles.searchImg} source={require('../img/search.png')}/>
                         </TouchableOpacity>
                     </View>
                 </View>

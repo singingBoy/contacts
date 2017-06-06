@@ -5,25 +5,18 @@
  */
 
 import React, { Component } from 'react';
-import {
-    AppRegistry,
-    StyleSheet,
-    Text,
-    Image,
-    SectionList,
-    ScrollView,
-    TouchableOpacity,
-    View
-} from 'react-native';
+import {AppRegistry, Text, Image, SectionList, ScrollView, TouchableOpacity, Linking, View} from 'react-native';
+import { Toast, Modal, Button, List, InputItem } from 'antd-mobile';
 import _ from 'lodash';
 import pinyin from 'js-pinyin'
 pinyin.setOptions({checkPolyphone: false, charCase: 0});
+const Contacts = require('react-native-contacts');
+import Swipeable from 'react-native-swipeable';
 
+//自定义组件
 import Head from './components/head';
 import FunctionList from './components/functionList';
 import LetterList from './components/letterList';
-
-var Contacts = require('react-native-contacts');
 
 //样式
 import ListStyle from './components/style';
@@ -60,7 +53,7 @@ import ListStyle from './components/style';
 ]
 */
 
-const Row_Height = 45;
+const Row_Height = 65;
 
 export default class App extends Component {
 
@@ -70,21 +63,28 @@ export default class App extends Component {
             dataSource: [],
             letterList: [],
             refreshing: true,
+            visible: false,
+            name: '',
+            phone: '',
+            email: '',
         };
     }
 
     /*构建结构数据*/
     constructorData=(datas)=>{
-        const dataSource = [], letterList = [];
+        let dataSource = [], letterList = [];
         //星标朋友
         const loveFriends = [{familyName:'波',givenName:'波'},{familyName:'星级',givenName:'爆炸'}];
         dataSource.push({data:loveFriends, key: '星标朋友'})
         letterList.push('⭐');
 
+        const arr = [];
         Object.entries(datas).forEach(([key, value]) => {
-            dataSource.push({data: value, key: key});
+            arr.push({data: value, key: key});
             letterList.push(key);
         });
+        arr.sort( (a,b)=>  a.key.charCodeAt() - b.key.charCodeAt() );
+        dataSource = dataSource.concat(arr);
 
         this.setState({
             dataSource: dataSource,
@@ -93,15 +93,20 @@ export default class App extends Component {
         })
     };
 
-    componentWillMount(){
+    getContact =()=>{
         Contacts.getAll((err, contacts) => {
             if(err === 'denied'){
                 // error
+                Toast.fail('获取通讯录失败!',2);
             } else {
                 const datas = _.groupBy(contacts, (item) =>pinyin.getFullChars(item.familyName?item.familyName:item.givenName).substr(0,1).toUpperCase());
                 const dataSource = this.constructorData(datas);
             }
         })
+    };
+
+    componentWillMount(){
+        this.getContact();
     }
 
     /*行key唯一辅助方法*/
@@ -113,13 +118,54 @@ export default class App extends Component {
         // this.refs._sectionList.scrollToEnd({animated: true});
     };
 
+    /*打电话，发短信*/
+    _doSomething = (data, type='tel')=>{
+        if(data.phoneNumbers.length > 0){
+            const url = `${type}:${data.phoneNumbers[0].number}`;
+            Linking.canOpenURL(url).then(supported => {
+                if (!supported) Toast.info('错误电话格式!',2);
+                else return Linking.openURL(url);
+            }).catch(err =>{
+                Toast.info('操作失败!',2)
+            });
+        }else{
+            Toast.info('没有电话号码!',2)
+        }
+    };
+
+    onShowModal =()=>{
+        this.setState({
+            visible: true,
+        })
+    };
+
+    onCloseModal =()=>{
+        this.setState({
+            visible: false,
+        })
+    };
+
+    onHave = ()=>{
+        const {name, phone, email} = this.state;
+        const contact = {
+            familyName: name.substr(0,1),
+            givenName: name.substr(1,name.length),
+            phoneNumbers: [{label:'mobile',number: phone}],
+            emailAddresses: [{label: "work", email: email,}]
+        };
+        Contacts.addContact(contact, ()=>{
+            this.getContact();
+            this.onCloseModal();
+        })
+    };
+
     render() {
         return (
             <View style={{flex:1}}>
                 <Head headHeight={46} changeHeadHeight={(e)=>{}} />
                 <ScrollView>
                     {/*FunctionList展现标签,群聊等功能列表*/}
-                    <FunctionList changeFunctionHeight = {(e)=>{}} />
+                    <FunctionList onShowModal={this.onShowModal} />
 
                     <SectionList
                         ref='_sectionList'
@@ -128,12 +174,38 @@ export default class App extends Component {
                         keyExtractor={this._keyExtractor}
                         renderSectionHeader={this._renderHeader}
                         renderItem={this._renderItem}
-                        getItemLayout={(data,index)=>(
-                            {length: Row_Height, offset: (Row_Height+2) * index, index}
-                        )}
+                        getItemLayout={(data,index)=>{
+                            return (
+                                {length: Row_Height, offset: (Row_Height+2) * index, index}
+                            )
+                        }}
                     />
                 </ScrollView>
                 <LetterList onScrollToEnd={this.onScrollToEnd}/>
+
+                {/*添加弹窗*/}
+                <Modal
+                    transparent={false}
+                    visible={this.state.visible}
+                    animationType="slide-up"
+                    onClose={this.onCloseModal}
+                >
+                    <View>
+                        <List renderHeader={() => '新增'} >
+                            <InputItem clear onChange={(value) => this.setState({name: value,})} placeholder="姓名">
+                                姓名
+                            </InputItem>
+                            <InputItem clear onChange={(value) => this.setState({ phone: value,})} placeholder="手机">
+                                手机
+                            </InputItem>
+                            <InputItem clear onChange={(value) => this.setState({ email: value,})} placeholder="邮件">
+                                邮件
+                            </InputItem>
+                        </List>
+                    </View>
+                    <Button type="primary" inline onClick={this.onHave}>保存到通讯录中</Button>
+                    <Button type="primary" inline onClick={this.onCloseModal}>close modal</Button>
+                </Modal>
             </View>
         );
     }
@@ -149,62 +221,32 @@ export default class App extends Component {
 
     /*渲染行*/
     _renderItem = ({item, index})=>{
-        return (
-            <TouchableOpacity>
-                <View style={ListStyle.listItem}>
-                    {
-                        item.thumbnailPath?
-                            <Image style={ListStyle.img} source={{uri: item.thumbnailPath}} /> :
-                            <View style={[ListStyle.img, {backgroundColor:'#ccc'}]}/>
-                    }
-                    <Text>
-                        {item.familyName?item.familyName:''}{ item.givenName?item.givenName:''}
-                    </Text>
-                </View>
+        const rightButtons = [
+            <TouchableOpacity style={{justifyContent:'center'}} onPress={()=>this._doSomething(item,'tel')}>
+                <Image style={{width:40,height:40}} source={require('./img/tel.png')}/>
+            </TouchableOpacity>,
+            <TouchableOpacity style={{justifyContent:'center'}} onPress={()=>this._doSomething(item,'smsto')}>
+                <Image style={{width:35,height:35}} source={require('./img/mes.png')}/>
             </TouchableOpacity>
+        ];
+        return (
+            <Swipeable
+                rightButtons={rightButtons}
+                rightActionActivationDistance={200}
+            >
+                <TouchableOpacity onPress={()=>this._doSomething(item,'tel')}>
+                    <View style={ListStyle.listItem}>
+                        {
+                            item.thumbnailPath?
+                                <Image style={ListStyle.img} source={{uri: item.thumbnailPath}} /> :
+                                <View style={[ListStyle.img, {backgroundColor:'#ccc'}]}/>
+                        }
+                        <Text>
+                            {item.familyName?item.familyName:''}{ item.givenName?item.givenName:''}
+                        </Text>
+                    </View>
+                </TouchableOpacity>
+            </Swipeable >
         );
     };
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingTop: 25,
-        backgroundColor: '#fff',
-    },
-    swipeContainer: {
-    },
-    alphabetSidebar: {
-        position: 'absolute',
-        backgroundColor: 'transparent',
-        top: 0,
-        bottom: 0,
-        right: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    placeholderCircle: {
-        width: 50,
-        height: 50,
-        backgroundColor: '#ccc',
-        borderRadius: 25,
-        marginRight: 10,
-        marginLeft: 5,
-    },
-    imgSize: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-    },
-    name: {
-        fontSize: 15,
-    },
-    cell: {
-        height: 95,
-        borderBottomColor: '#ccc',
-        borderBottomWidth: 1,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-});
